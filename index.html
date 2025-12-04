@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>SJ Gardens - Generar Recibo</title>
+  <style>
+    body{font-family:Arial;background:#f6f7fb;margin:0;padding:20px}
+    .card{max-width:720px;margin:20px auto;background:#fff;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    input, select, textarea{width:100%;padding:10px;margin-top:8px;border-radius:6px;border:1px solid #e0e0e0}
+    button{background:#2563eb;color:#fff;padding:10px 14px;border:none;border-radius:6px;margin-top:12px;cursor:pointer}
+    .result{margin-top:16px;padding:12px;background:#f8fafc;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Generar Recibo</h2>
+
+    <label>Vivienda</label>
+    <select id="vivienda"></select>
+
+    <label>Concepto</label>
+    <input id="concepto" placeholder="Ej: Alícuota, Mantenimiento, Multa...">
+
+    <label>Valor (USD)</label>
+    <input id="valor" type="number" step="0.01" placeholder="0.00">
+
+    <button id="send">Generar y Enviar</button>
+
+    <div id="result" class="result" style="display:none"></div>
+  </div>
+
+<script>
+  // Pega aquí la URL que obtengas al desplegar el Apps Script (Web App)
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzJmykwxYFYFZt-d10GlkowEbbKqmxRkdj1QO0hlV4xqtZvU5_D5KV-ATFrbhtr3v02nQ/exec';
+
+  // Cargar viviendas al iniciar
+  async function loadViviendas(){
+    try {
+      const r = await fetch(API_URL);
+      const j = await r.json();
+      if (j.status !== 'ok') {
+        console.warn('No se pudo cargar viviendas', j);
+        return;
+      }
+      const sel = document.getElementById('vivienda');
+      sel.innerHTML = j.viviendas.map(v => `<option value="${v.vivienda}">${v.vivienda} — ${v.copropietario}</option>`).join('');
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  document.getElementById('send').addEventListener('click', async ()=>{
+    const vivienda = document.getElementById('vivienda').value;
+    const concepto = document.getElementById('concepto').value.trim();
+    const valor = document.getElementById('valor').value.trim();
+
+    if (!vivienda || !concepto || !valor) return alert('Completa vivienda, concepto y valor');
+
+    const payload = { vivienda, concepto, valor };
+
+    const btn = document.getElementById('send');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.status === 'ok') {
+        document.getElementById('result').style.display = 'block';
+        document.getElementById('result').innerHTML = `
+          <strong>Recibo creado</strong><br>
+          Número: ${json.numeroRecibo} <br>
+          <a href="${json.pdfUrl}" target="_blank">Ver / Descargar PDF</a>
+        `;
+        // limpiar form si quieres
+        document.getElementById('concepto').value = '';
+        document.getElementById('valor').value = '';
+      } else {
+        alert('Error: ' + (json.message || json.error || 'Respuesta inválida'));
+      }
+    } catch (err) {
+      alert('Error en petición: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generar y Enviar';
+    }
+  });
+
+  // init
+  loadViviendas();
+</script>
+</body>
+</html>
